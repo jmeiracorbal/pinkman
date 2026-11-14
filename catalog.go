@@ -59,6 +59,18 @@ func (c *Catalog) Discover(ctx context.Context) Discovery {
 	return discovery
 }
 
+func (c *Catalog) DefaultTarget(ctx context.Context, backendID string) (Target, error) {
+	backend, ok := c.backends[backendID]
+	if !ok {
+		return Target{}, fmt.Errorf("pinkman: unknown backend %q", backendID)
+	}
+	provider, ok := backend.(DefaultTargetProvider)
+	if !ok {
+		return Target{}, fmt.Errorf("pinkman: backend %q does not expose a verifiable default target", backendID)
+	}
+	return provider.DefaultTarget(ctx)
+}
+
 func (c *Catalog) Execute(ctx context.Context, invocation Invocation) (Result, error) {
 	backend, ok := c.backends[invocation.Target.Backend]
 	if !ok {
