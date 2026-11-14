@@ -2,6 +2,7 @@ package opencode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"sort"
@@ -54,6 +55,38 @@ func (b *Backend) Discover(ctx context.Context) ([]pinkman.Target, error) {
 		})
 	}
 	return targets, nil
+}
+
+func (b *Backend) DefaultTarget(ctx context.Context) (pinkman.Target, error) {
+	path, err := exec.LookPath(b.config.Executable)
+	if err != nil {
+		return pinkman.Target{}, fmt.Errorf("opencode adapter: executable %q not found: %w", b.config.Executable, err)
+	}
+	cmd := exec.CommandContext(ctx, path, "debug", "config")
+	cmd.Dir = b.config.Directory
+	output, err := cmd.Output()
+	if err != nil {
+		return pinkman.Target{}, fmt.Errorf("opencode adapter: resolve default model: %w", err)
+	}
+	var config struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(output, &config); err != nil {
+		return pinkman.Target{}, fmt.Errorf("opencode adapter: decode resolved config: %w", err)
+	}
+	if strings.TrimSpace(config.Model) == "" {
+		return pinkman.Target{}, fmt.Errorf("opencode adapter: resolved config has no explicit default model")
+	}
+	targets, err := b.Discover(ctx)
+	if err != nil {
+		return pinkman.Target{}, err
+	}
+	for _, target := range targets {
+		if target.Model == config.Model {
+			return target, nil
+		}
+	}
+	return pinkman.Target{}, fmt.Errorf("opencode adapter: configured default model %q is not available", config.Model)
 }
 
 func (b *Backend) Execute(ctx context.Context, invocation pinkman.Invocation) (pinkman.Result, error) {
