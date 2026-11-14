@@ -52,3 +52,7 @@ type Backend interface {
 	Discover(context.Context) ([]Target, error)
 	Execute(context.Context, Invocation) (Result, error)
 }
+
+type DefaultTargetProvider interface {
+	DefaultTarget(context.Context) (Target, error)
+}
